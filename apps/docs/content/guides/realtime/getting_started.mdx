@@ -113,7 +113,10 @@ const channel = supabase.channel('room:lobby:messages', {
 
 ```dart
 // Create a channel with a descriptive topic name
-final channel = supabase.channel('room:lobby:messages');
+final channel = supabase.channel(
+  'room:lobby:messages',
+  opts: RealtimeChannelConfig(private: true), // Recommended for production
+);
 ```
 
 </TabPanel>
