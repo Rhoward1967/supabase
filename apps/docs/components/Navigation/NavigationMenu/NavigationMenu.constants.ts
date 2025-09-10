@@ -1712,6 +1712,7 @@ export const realtime: NavMenuConstant = {
           enabled: billingEnabled,
         },
         { name: 'Architecture', url: '/guides/realtime/architecture' },
+        { name: 'Concepts', url: '/guides/realtime/concepts' },
         { name: 'Protocol', url: '/guides/realtime/protocol', items: [] },
         { name: 'Benchmarks', url: '/guides/realtime/benchmarks' },
       ],
