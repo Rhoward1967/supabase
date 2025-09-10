@@ -17,6 +17,14 @@ const args = parseArgs({
 
 async function generateEmbeddings() {
   const shouldRefresh = Boolean(args.values.refresh)
+  const isNimbusMode = process.env.ENABLED_FEATURES_OVERRIDE_DISABLE_ALL === 'true'
+
+  const pageTable = isNimbusMode ? 'page_nimbus' : 'page'
+  const pageSectionTable = isNimbusMode ? 'page_section_nimbus' : 'page_section'
+
+  if (isNimbusMode) {
+    console.log('Running in Nimbus mode - will filter content based on disabled feature flags')
+  }
 
   const requiredEnvVars = [
     'DOCS_GITHUB_APP_ID',
@@ -65,169 +73,173 @@ async function generateEmbeddings() {
     console.log('Refresh flag set, re-generating all pages')
   }
 
-  for (const embeddingSource of embeddingSources) {
-    const { type, source, path } = embeddingSource
+  await Promise.all(
+    embeddingSources.map(async (embeddingSource) => {
+      const { type, source, path } = embeddingSource
 
-    try {
-      const {
-        checksum,
-        sections,
-        meta = {},
-        ragIgnore = false,
-      }: {
-        checksum: string
-        sections: Section[]
-        ragIgnore?: boolean
-        meta?: Record<string, unknown>
-      } = await embeddingSource.process()
+      try {
+        const {
+          checksum,
+          sections,
+          meta = {},
+          ragIgnore = false,
+        }: {
+          checksum: string
+          sections: Section[]
+          ragIgnore?: boolean
+          meta?: Record<string, unknown>
+        } = await embeddingSource.process()
 
-      // Check for existing page in DB and compare checksums
-      const { error: fetchPageError, data: existingPage } = await supabaseClient
-        .from('page')
-        .select('id, path, checksum')
-        .filter('path', 'eq', path)
-        .limit(1)
-        .maybeSingle()
+        // Check for existing page in DB and compare checksums
+        const { error: fetchPageError, data: existingPage } = await supabaseClient
+          .from(pageTable)
+          .select('id, path, checksum')
+          .filter('path', 'eq', path)
+          .limit(1)
+          .maybeSingle()
 
-      if (fetchPageError) {
-        throw fetchPageError
-      }
+        if (fetchPageError) {
+          throw fetchPageError
+        }
 
-      // We use checksum to determine if this page & its sections need to be regenerated
-      if (!shouldRefresh && existingPage?.checksum === checksum) {
-        // No content/embedding update required on this page
-        // Update other meta info
+        // We use checksum to determine if this page & its sections need to be regenerated
+        if (!shouldRefresh && existingPage?.checksum === checksum) {
+          // No content/embedding update required on this page
+          // Update other meta info
+          const { error: updatePageError } = await supabaseClient
+            .from(pageTable)
+            .update({
+              type,
+              source,
+              meta,
+              version: refreshVersion,
+              last_refresh: refreshDate,
+            })
+            .filter('id', 'eq', existingPage.id)
+
+          if (updatePageError) {
+            throw updatePageError
+          }
+
+          return
+        }
+
+        if (existingPage) {
+          if (!shouldRefresh) {
+            console.log(
+              `[${path}] Docs have changed, removing old page sections and their embeddings`
+            )
+          } else {
+            console.log(
+              `[${path}] Refresh flag set, removing old page sections and their embeddings`
+            )
+          }
+
+          const { error: deletePageSectionError } = await supabaseClient
+            .from(pageSectionTable)
+            .delete()
+            .filter('page_id', 'eq', existingPage.id)
+
+          if (deletePageSectionError) {
+            throw deletePageSectionError
+          }
+        }
+
+        // Create/update page record. Intentionally clear checksum until we
+        // have successfully generated all page sections.
+        const { error: upsertPageError, data: page } = await supabaseClient
+          .from(pageTable)
+          .upsert(
+            {
+              checksum: null,
+              path,
+              type,
+              source,
+              meta,
+              content: embeddingSource.extractIndexedContent(),
+              version: refreshVersion,
+              last_refresh: refreshDate,
+            },
+            { onConflict: 'path' }
+          )
+          .select()
+          .limit(1)
+          .single()
+
+        if (upsertPageError) {
+          throw upsertPageError
+        }
+
+        console.log(`[${path}] Adding ${sections.length} page sections (with embeddings)`)
+        for (const { slug, heading, content } of sections) {
+          // OpenAI recommends replacing newlines with spaces for best results (specific to embeddings)
+          // force a redeploy
+          const input = content.replace(/\n/g, ' ')
+
+          try {
+            const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+            const embeddingResponse = await openai.embeddings.create({
+              model: 'text-embedding-ada-002',
+              input,
+            })
+
+            const [responseData] = embeddingResponse.data
+
+            const { error: insertPageSectionError } = await supabaseClient
+              .from(pageSectionTable)
+              .insert({
+                page_id: page.id,
+                slug,
+                heading,
+                content,
+                token_count: embeddingResponse.usage.total_tokens,
+                embedding: responseData.embedding,
+                rag_ignore: ragIgnore,
+              })
+              .select()
+              .limit(1)
+              .single()
+
+            if (insertPageSectionError) {
+              throw insertPageSectionError
+            }
+          } catch (err) {
+            // TODO: decide how to better handle failed embeddings
+            console.error(
+              `Failed to generate embeddings for '${path}' page section starting with '${input.slice(
+                0,
+                40
+              )}...'`
+            )
+
+            throw err
+          }
+        }
+
+        // Set page checksum so that we know this page was stored successfully
         const { error: updatePageError } = await supabaseClient
-          .from('page')
-          .update({
-            type,
-            source,
-            meta,
-            version: refreshVersion,
-            last_refresh: refreshDate,
-          })
-          .filter('id', 'eq', existingPage.id)
+          .from(pageTable)
+          .update({ checksum })
+          .filter('id', 'eq', page.id)
 
         if (updatePageError) {
           throw updatePageError
         }
-
-        continue
-      }
-
-      if (existingPage) {
-        if (!shouldRefresh) {
-          console.log(
-            `[${path}] Docs have changed, removing old page sections and their embeddings`
-          )
-        } else {
-          console.log(`[${path}] Refresh flag set, removing old page sections and their embeddings`)
-        }
-
-        const { error: deletePageSectionError } = await supabaseClient
-          .from('page_section')
-          .delete()
-          .filter('page_id', 'eq', existingPage.id)
-
-        if (deletePageSectionError) {
-          throw deletePageSectionError
-        }
-      }
-
-      // Create/update page record. Intentionally clear checksum until we
-      // have successfully generated all page sections.
-      const { error: upsertPageError, data: page } = await supabaseClient
-        .from('page')
-        .upsert(
-          {
-            checksum: null,
-            path,
-            type,
-            source,
-            meta,
-            content: embeddingSource.extractIndexedContent(),
-            version: refreshVersion,
-            last_refresh: refreshDate,
-          },
-          { onConflict: 'path' }
+      } catch (err) {
+        console.error(
+          `Page '${path}' or one/multiple of its page sections failed to store properly. Page has been marked with null checksum to indicate that it needs to be re-generated.`
         )
-        .select()
-        .limit(1)
-        .single()
-
-      if (upsertPageError) {
-        throw upsertPageError
+        console.error(err)
       }
-
-      console.log(`[${path}] Adding ${sections.length} page sections (with embeddings)`)
-      for (const { slug, heading, content } of sections) {
-        // OpenAI recommends replacing newlines with spaces for best results (specific to embeddings)
-        // force a redeploy
-        const input = content.replace(/\n/g, ' ')
-
-        try {
-          const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
-          const embeddingResponse = await openai.embeddings.create({
-            model: 'text-embedding-ada-002',
-            input,
-          })
-
-          const [responseData] = embeddingResponse.data
-
-          const { error: insertPageSectionError } = await supabaseClient
-            .from('page_section')
-            .insert({
-              page_id: page.id,
-              slug,
-              heading,
-              content,
-              token_count: embeddingResponse.usage.total_tokens,
-              embedding: responseData.embedding,
-              rag_ignore: ragIgnore,
-            })
-            .select()
-            .limit(1)
-            .single()
-
-          if (insertPageSectionError) {
-            throw insertPageSectionError
-          }
-        } catch (err) {
-          // TODO: decide how to better handle failed embeddings
-          console.error(
-            `Failed to generate embeddings for '${path}' page section starting with '${input.slice(
-              0,
-              40
-            )}...'`
-          )
-
-          throw err
-        }
-      }
-
-      // Set page checksum so that we know this page was stored successfully
-      const { error: updatePageError } = await supabaseClient
-        .from('page')
-        .update({ checksum })
-        .filter('id', 'eq', page.id)
-
-      if (updatePageError) {
-        throw updatePageError
-      }
-    } catch (err) {
-      console.error(
-        `Page '${path}' or one/multiple of its page sections failed to store properly. Page has been marked with null checksum to indicate that it needs to be re-generated.`
-      )
-      console.error(err)
-    }
-  }
+    })
+  )
 
   console.log(`Removing old pages and their sections`)
 
   // Delete pages that have been removed (and their sections via cascade)
   const { error: deletePageError } = await supabaseClient
-    .from('page')
+    .from(pageTable)
     .delete()
     .filter('version', 'neq', refreshVersion)
 

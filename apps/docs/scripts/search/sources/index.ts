@@ -1,3 +1,4 @@
+import { type GuideModel } from '../../../resources/guide/guideModel.js'
 import { GuideModelLoader } from '../../../resources/guide/guideModelLoader.js'
 import {
   GitHubDiscussionLoader,
@@ -28,7 +29,7 @@ export type SearchSource =
 export async function fetchGuideSources() {
   const guides = (await GuideModelLoader.allFromFs()).unwrapLeft()
 
-  return guides.map((guide) => MarkdownLoader.fromGuideModel('guide', guide))
+  return guides.map((guide: GuideModel) => MarkdownLoader.fromGuideModel('guide', guide))
 }
 
 export async function fetchOpenApiReferenceSource() {
