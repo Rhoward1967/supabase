@@ -89,7 +89,7 @@ begin
 	  page_nimbus.meta ->> 'title' as title,
 	  page_nimbus.meta ->> 'subtitle' as subtitle,
 	  page_nimbus.meta ->> 'description' as description
-	from page_nimbus
+	from public.page_nimbus
 	where title_tokens @@ websearch_to_tsquery(query) or fts_tokens @@ websearch_to_tsquery(query)
 	order by greatest(
 		-- Title is more important than body, so use 10 as the weighting factor
@@ -205,9 +205,9 @@ as $$
 begin
   return query
   select *
-  from public.page_section
-  where (page_section.embedding operator(public.<#>) embedding) <= -match_threshold
-  order by page_section.embedding operator(public.<#>) embedding
+  from public.page_section_nimbus
+  where (page_section_nimbus.embedding operator(public.<#>) embedding) <= -match_threshold
+  order by page_section_nimbus.embedding operator(public.<#>) embedding
   limit max_results;
 end;
 $$;
@@ -234,29 +234,29 @@ begin
   return query
   with match as(
 	select *
-	from public.page_section
+	from public.page_section_nimbus
 	-- The dot product is negative because of a Postgres limitation, so we negate it
-	where (page_section.embedding operator(public.<#>) embedding) * -1 > match_threshold	
+	where (page_section_nimbus.embedding operator(public.<#>) embedding) * -1 > match_threshold	
 	-- OpenAI embeddings are normalized to length 1, so
 	-- cosine similarity and dot product will produce the same results.
 	-- Using dot product which can be computed slightly faster.
 	--
 	-- For the different syntaxes, see https://github.com/pgvector/pgvector
-	order by page_section.embedding operator(public.<#>) embedding
+	order by page_section_nimbus.embedding operator(public.<#>) embedding
 	limit 10
   )
   select
-	page.id,
-	page.path,
-	page.type,
-	page.meta ->> 'title' as title,
-	page.meta ->> 'subtitle' as title,
-	page.meta ->> 'description' as description,
+	page_nimbus.id,
+	page_nimbus.path,
+	page_nimbus.type,
+	page_nimbus.meta ->> 'title' as title,
+	page_nimbus.meta ->> 'subtitle' as title,
+	page_nimbus.meta ->> 'description' as description,
 	array_agg(match.heading) as headings,
 	array_agg(match.slug) as slugs
-  from public.page
-  join match on match.page_id = page.id
-  group by page.id;
+  from public.page_nimbus
+  join match on match.page_id = page_nimbus.id
+  group by page_nimbus.id;
 end;
 $$;
 
@@ -282,20 +282,20 @@ as $$
     select
       *,
       row_number() over () as ranking
-    from public.match_embedding(
+    from public.match_embedding_nimbus(
       embedding,
       match_threshold,
       max_result
     )
   )
   select
-    page.id,
+    page_nimbus.id,
     meta ->> 'title' as page_title,
     type,
     public.get_full_content_url(type, path, null) as href,
     case
       when include_full_content
-        then page.content
+        then page_nimbus.content
       else
         null
     end as content,
@@ -308,8 +308,8 @@ as $$
       )
     )
   from matched_section
-  join public.page on matched_section.page_id = page.id
-  group by page.id
+  join public.page_nimbus on matched_section.page_id = page_nimbus.id
+  group by page_nimbus.id
   order by min(ranking);
 $$;
 
