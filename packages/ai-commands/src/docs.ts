@@ -69,6 +69,7 @@ export async function clippy(
   const searchFunction = options?.useAltSearchIndex
     ? 'match_page_sections_v2_nimbus'
     : 'match_page_sections_v2'
+  const joinedTable = options?.useAltSearchIndex ? 'page_nimbus' : 'page'
 
   const { error: matchError, data: pageSections } = (await supabaseClient
     .rpc(searchFunction, {
@@ -77,7 +78,7 @@ export async function clippy(
       min_content_length: 50,
     })
     .neq('rag_ignore', true)
-    .select('content,page!inner(path),rag_ignore')
+    .select(`content,${joinedTable}!inner(path),rag_ignore`)
     .limit(10)) as { error: any; data: PageSection[] | null }
 
   if (matchError || !pageSections) {
