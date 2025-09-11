@@ -202,7 +202,10 @@ const useDocsSearch = () => {
 
     let sourcesLoaded = 0
 
-    fetch(`${SUPABASE_URL}/rest/v1/rpc/docs_search_fts`, {
+    const useAlternateSearchIndex = !isFeatureEnabled('search:fullIndex')
+
+    const searchEndpoint = useAlternateSearchIndex ? 'docs_search_fts_nimbus' : 'docs_search_fts'
+    fetch(`${SUPABASE_URL}/rest/v1/rpc/${searchEndpoint}`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -244,7 +247,6 @@ const useDocsSearch = () => {
         })
       })
 
-    const useAlternateSearchIndex = !isFeatureEnabled('search:fullIndex')
     fetch(`${SUPABASE_URL}${FUNCTIONS_URL}search-embeddings`, {
       method: 'POST',
       body: JSON.stringify({ query, useAlternateSearchIndex }),
