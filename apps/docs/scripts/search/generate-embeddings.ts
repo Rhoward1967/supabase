@@ -27,6 +27,11 @@ const CONFIG = {
   OPENAI_MAX_RETRIES: 3,
   OPENAI_BASE_DELAY_MS: 500,
   OPENAI_MAX_CONCURRENCY: 3,
+  /**
+   * If context length is exceeded, truncate inputs over this character length
+   * and retry. This is a character-based heuristic, not token-exact.
+   */
+  EMBEDDING_TRUNCATE_CHAR_LIMIT: 16000,
 
   // Supabase settings
   SUPABASE_BATCH_SIZE: 500,
@@ -51,7 +56,8 @@ async function withRetry<T>(
   operation: () => Promise<T>,
   maxRetries: number,
   baseDelay: number,
-  operationName: string
+  operationName: string,
+  shouldRetryOnError: (error: unknown) => boolean = () => true
 ): Promise<T> {
   let lastError: Error
 
@@ -60,6 +66,12 @@ async function withRetry<T>(
       return await operation()
     } catch (error) {
       lastError = error as Error
+
+      // Allow caller to prevent redundant retries for specific errors
+      if (!shouldRetryOnError?.(error)) {
+        console.warn(`${operationName} encountered non-retryable error:`, lastError.message)
+        throw lastError
+      }
 
       if (attempt === maxRetries) {
         console.error(`${operationName} failed after ${maxRetries + 1} attempts:`, lastError)
@@ -319,16 +331,57 @@ async function processEmbeddingBatch(
     `Processing embedding batch ${batchIndex + 1}/${totalBatches} (${inputs.length} sections)`
   )
 
-  const embeddingResponse = await withRetry(
-    () =>
-      openai.embeddings.create({
-        model: CONFIG.EMBEDDING_MODEL,
-        input: inputs,
-      }),
-    CONFIG.OPENAI_MAX_RETRIES,
-    CONFIG.OPENAI_BASE_DELAY_MS,
-    `OpenAI embedding batch ${batchIndex + 1}`
-  )
+  // Helper to identify context length exceeded errors from OpenAI
+  const isContextLengthError = (err: unknown) => {
+    const msg = typeof err === 'object' && err !== null ? String((err as any).message || '') : ''
+    const code = typeof err === 'object' && err !== null ? String((err as any).code || '') : ''
+    const status = typeof err === 'object' && err !== null ? Number((err as any).status || 0) : 0
+    const text = (msg + ' ' + code).toLowerCase()
+    return (
+      text.includes('context length') ||
+      text.includes('maximum context length') ||
+      text.includes('too many tokens') ||
+      text.includes('max input tokens') ||
+      text.includes('input is too long') ||
+      (status === 400 && text.includes('tokens'))
+    )
+  }
+
+  let embeddingResponse: OpenAI.Embeddings.CreateEmbeddingResponse
+  try {
+    embeddingResponse = await withRetry(
+      () =>
+        openai.embeddings.create({
+          model: CONFIG.EMBEDDING_MODEL,
+          input: inputs,
+        }),
+      CONFIG.OPENAI_MAX_RETRIES,
+      CONFIG.OPENAI_BASE_DELAY_MS,
+      `OpenAI embedding batch ${batchIndex + 1}`,
+      (err) => !isContextLengthError(err)
+    )
+  } catch (err) {
+    if (!isContextLengthError(err)) {
+      throw err
+    }
+
+    // Context length exceeded: truncate problematic sections and try once more
+    const limit = CONFIG.EMBEDDING_TRUNCATE_CHAR_LIMIT
+    const truncatedInputs = inputs.map((s) => (s.length > limit ? s.slice(0, limit) : s))
+    const truncatedCount = truncatedInputs.filter((s, i) => s !== inputs[i]).length
+    console.warn(
+      `OpenAI embedding batch ${batchIndex + 1}: context length exceeded. ` +
+        `Truncating ${truncatedCount} overly long section(s) to ${limit} chars and retrying once.`
+    )
+
+    embeddingResponse = await openai.embeddings.create({
+      model: CONFIG.EMBEDDING_MODEL,
+      input: truncatedInputs,
+    })
+
+    // Replace inputs with truncated inputs for downstream mapping
+    for (let i = 0; i < inputs.length; i++) inputs[i] = truncatedInputs[i]
+  }
 
   if (embeddingResponse.data.length !== inputs.length) {
     console.error(
