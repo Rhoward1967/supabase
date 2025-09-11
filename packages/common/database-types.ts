@@ -1,4 +1,10 @@
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export type Database = {
   content: {
@@ -39,11 +45,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'error_service_fkey'
-            columns: ['service']
+            foreignKeyName: "error_service_fkey"
+            columns: ["service"]
             isOneToOne: false
-            referencedRelation: 'service'
-            referencedColumns: ['id']
+            referencedRelation: "service"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -133,21 +139,21 @@ export type Database = {
           id: number
           metadata: Json | null
           page: string
-          vote: Database['public']['Enums']['feedback_vote']
+          vote: Database["public"]["Enums"]["feedback_vote"]
         }
         Insert: {
           date_created?: string
           id?: never
           metadata?: Json | null
           page: string
-          vote: Database['public']['Enums']['feedback_vote']
+          vote: Database["public"]["Enums"]["feedback_vote"]
         }
         Update: {
           date_created?: string
           id?: never
           metadata?: Json | null
           page?: string
-          vote?: Database['public']['Enums']['feedback_vote']
+          vote?: Database["public"]["Enums"]["feedback_vote"]
         }
         Relationships: []
       }
@@ -244,11 +250,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'meetups_launch_week_fkey'
-            columns: ['launch_week']
+            foreignKeyName: "meetups_launch_week_fkey"
+            columns: ["launch_week"]
             isOneToOne: false
-            referencedRelation: 'launch_weeks'
-            referencedColumns: ['id']
+            referencedRelation: "launch_weeks"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -294,6 +300,48 @@ export type Database = {
         }
         Relationships: []
       }
+      page_nimbus: {
+        Row: {
+          checksum: string | null
+          content: string | null
+          fts_tokens: unknown | null
+          id: number
+          last_refresh: string | null
+          meta: Json | null
+          path: string
+          source: string | null
+          title_tokens: unknown | null
+          type: string | null
+          version: string | null
+        }
+        Insert: {
+          checksum?: string | null
+          content?: string | null
+          fts_tokens?: unknown | null
+          id?: never
+          last_refresh?: string | null
+          meta?: Json | null
+          path: string
+          source?: string | null
+          title_tokens?: unknown | null
+          type?: string | null
+          version?: string | null
+        }
+        Update: {
+          checksum?: string | null
+          content?: string | null
+          fts_tokens?: unknown | null
+          id?: never
+          last_refresh?: string | null
+          meta?: Json | null
+          path?: string
+          source?: string | null
+          title_tokens?: unknown | null
+          type?: string | null
+          version?: string | null
+        }
+        Relationships: []
+      }
       page_section: {
         Row: {
           content: string | null
@@ -327,11 +375,52 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'page_section_page_id_fkey'
-            columns: ['page_id']
+            foreignKeyName: "page_section_page_id_fkey"
+            columns: ["page_id"]
             isOneToOne: false
-            referencedRelation: 'page'
-            referencedColumns: ['id']
+            referencedRelation: "page"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      page_section_nimbus: {
+        Row: {
+          content: string | null
+          embedding: string | null
+          heading: string | null
+          id: number
+          page_id: number
+          rag_ignore: boolean | null
+          slug: string | null
+          token_count: number | null
+        }
+        Insert: {
+          content?: string | null
+          embedding?: string | null
+          heading?: string | null
+          id?: never
+          page_id: number
+          rag_ignore?: boolean | null
+          slug?: string | null
+          token_count?: number | null
+        }
+        Update: {
+          content?: string | null
+          embedding?: string | null
+          heading?: string | null
+          id?: never
+          page_id?: number
+          rag_ignore?: boolean | null
+          slug?: string | null
+          token_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_section_nimbus_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "page_nimbus"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -392,25 +481,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'public_tickets_id_fkey'
-            columns: ['user_id']
+            foreignKeyName: "public_tickets_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: 'users'
-            referencedColumns: ['id']
+            referencedRelation: "users"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'tickets_launch_week_fkey'
-            columns: ['launch_week']
+            foreignKeyName: "tickets_launch_week_fkey"
+            columns: ["launch_week"]
             isOneToOne: false
-            referencedRelation: 'launch_weeks'
-            referencedColumns: ['id']
+            referencedRelation: "launch_weeks"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'tickets_user_id_fkey'
-            columns: ['user_id']
+            foreignKeyName: "tickets_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: 'users'
-            referencedColumns: ['id']
+            referencedRelation: "users"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -496,11 +585,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'tickets_launch_week_fkey'
-            columns: ['launch_week']
+            foreignKeyName: "tickets_launch_week_fkey"
+            columns: ["launch_week"]
             isOneToOne: false
-            referencedRelation: 'launch_weeks'
-            referencedColumns: ['id']
+            referencedRelation: "launch_weeks"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -526,7 +615,36 @@ export type Database = {
           slugs: string[]
         }[]
       }
+      docs_search_embeddings_nimbus: {
+        Args: {
+          embedding: string
+          match_threshold: number
+        }
+        Returns: {
+          id: number
+          path: string
+          type: string
+          title: string
+          subtitle: string
+          description: string
+          headings: string[]
+          slugs: string[]
+        }[]
+      }
       docs_search_fts: {
+        Args: {
+          query: string
+        }
+        Returns: {
+          id: number
+          path: string
+          type: string
+          title: string
+          subtitle: string
+          description: string
+        }[]
+      }
+      docs_search_fts_nimbus: {
         Args: {
           query: string
         }
@@ -558,7 +676,7 @@ export type Database = {
       }
       hnswhandler: {
         Args: {
-          '': unknown
+          "": unknown
         }
         Returns: unknown
       }
@@ -573,7 +691,7 @@ export type Database = {
       }
       ivfflathandler: {
         Args: {
-          '': unknown
+          "": unknown
         }
         Returns: unknown
       }
@@ -621,7 +739,41 @@ export type Database = {
           token_count: number | null
         }[]
       }
+      match_embedding_nimbus: {
+        Args: {
+          embedding: string
+          match_threshold?: number
+          max_results?: number
+        }
+        Returns: {
+          content: string | null
+          embedding: string | null
+          heading: string | null
+          id: number
+          page_id: number
+          rag_ignore: boolean | null
+          slug: string | null
+          token_count: number | null
+        }[]
+      }
       match_page_sections_v2: {
+        Args: {
+          embedding: string
+          match_threshold: number
+          min_content_length: number
+        }
+        Returns: {
+          content: string | null
+          embedding: string | null
+          heading: string | null
+          id: number
+          page_id: number
+          rag_ignore: boolean | null
+          slug: string | null
+          token_count: number | null
+        }[]
+      }
+      match_page_sections_v2_nimbus: {
         Args: {
           embedding: string
           match_threshold: number
@@ -676,6 +828,44 @@ export type Database = {
           subsections: Json[]
         }[]
       }
+      search_content_hybrid_nimbus: {
+        Args: {
+          query_text: string
+          query_embedding: string
+          max_result?: number
+          full_text_weight?: number
+          semantic_weight?: number
+          rrf_k?: number
+          match_threshold?: number
+          include_full_content?: boolean
+        }
+        Returns: {
+          id: number
+          page_title: string
+          type: string
+          href: string
+          content: string
+          metadata: Json
+          subsections: Json[]
+        }[]
+      }
+      search_content_nimbus: {
+        Args: {
+          embedding: string
+          include_full_content?: boolean
+          match_threshold?: number
+          max_result?: number
+        }
+        Returns: {
+          id: number
+          page_title: string
+          type: string
+          href: string
+          content: string
+          metadata: Json
+          subsections: Json[]
+        }[]
+      }
       update_last_changed_checksum: {
         Args: {
           new_parent_page: string
@@ -694,43 +884,43 @@ export type Database = {
       }
       vector_avg: {
         Args: {
-          '': number[]
+          "": number[]
         }
         Returns: string
       }
       vector_dims: {
         Args: {
-          '': string
+          "": string
         }
         Returns: number
       }
       vector_norm: {
         Args: {
-          '': string
+          "": string
         }
         Returns: number
       }
       vector_out: {
         Args: {
-          '': string
+          "": string
         }
         Returns: unknown
       }
       vector_send: {
         Args: {
-          '': string
+          "": string
         }
         Returns: string
       }
       vector_typmod_in: {
         Args: {
-          '': unknown[]
+          "": unknown[]
         }
         Returns: number
       }
     }
     Enums: {
-      feedback_vote: 'yes' | 'no'
+      feedback_vote: "yes" | "no"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -840,11 +1030,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'objects_bucketId_fkey'
-            columns: ['bucket_id']
+            foreignKeyName: "objects_bucketId_fkey"
+            columns: ["bucket_id"]
             isOneToOne: false
-            referencedRelation: 'buckets'
-            referencedColumns: ['id']
+            referencedRelation: "buckets"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -917,25 +1107,27 @@ export type Database = {
   }
 }
 
-type PublicSchema = Database[Extract<keyof Database, 'public'>]
+type PublicSchema = Database[Extract<keyof Database, "public">]
 
 export type Tables<
   PublicTableNameOrOptions extends
-    | keyof (PublicSchema['Tables'] & PublicSchema['Views'])
+    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
     | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof (Database[PublicTableNameOrOptions['schema']]['Tables'] &
-        Database[PublicTableNameOrOptions['schema']]['Views'])
+    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+        Database[PublicTableNameOrOptions["schema"]]["Views"])
     : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions['schema']]['Tables'] &
-      Database[PublicTableNameOrOptions['schema']]['Views'])[TableName] extends {
+  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema['Tables'] & PublicSchema['Views'])
-    ? (PublicSchema['Tables'] & PublicSchema['Views'])[PublicTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
+        PublicSchema["Views"])
+    ? (PublicSchema["Tables"] &
+        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -943,18 +1135,20 @@ export type Tables<
     : never
 
 export type TablesInsert<
-  PublicTableNameOrOptions extends keyof PublicSchema['Tables'] | { schema: keyof Database },
+  PublicTableNameOrOptions extends
+    | keyof PublicSchema["Tables"]
+    | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions['schema']]['Tables']
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema['Tables']
-    ? PublicSchema['Tables'][PublicTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
+    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -962,18 +1156,20 @@ export type TablesInsert<
     : never
 
 export type TablesUpdate<
-  PublicTableNameOrOptions extends keyof PublicSchema['Tables'] | { schema: keyof Database },
+  PublicTableNameOrOptions extends
+    | keyof PublicSchema["Tables"]
+    | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions['schema']]['Tables']
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema['Tables']
-    ? PublicSchema['Tables'][PublicTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
+    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -981,12 +1177,15 @@ export type TablesUpdate<
     : never
 
 export type Enums<
-  PublicEnumNameOrOptions extends keyof PublicSchema['Enums'] | { schema: keyof Database },
+  PublicEnumNameOrOptions extends
+    | keyof PublicSchema["Enums"]
+    | { schema: keyof Database },
   EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicEnumNameOrOptions['schema']]['Enums']
+    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
 > = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions['schema']]['Enums'][EnumName]
-  : PublicEnumNameOrOptions extends keyof PublicSchema['Enums']
-    ? PublicSchema['Enums'][PublicEnumNameOrOptions]
+  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
+    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
     : never
+

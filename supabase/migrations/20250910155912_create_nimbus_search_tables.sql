@@ -191,3 +191,125 @@ group by page_nimbus.id
 order by max(rrf.rrf_score) desc
 limit max_result;
 $$;
+
+create or replace function match_page_sections_v2_nimbus(
+  embedding vector(1536),
+  match_threshold float,
+  min_content_length int
+)
+returns setof page_section_nimbus
+set search_path = ''
+language plpgsql
+as $$
+#variable_conflict use_variable
+begin
+  return query
+  select *
+  from public.page_section
+  where (page_section.embedding operator(public.<#>) embedding) <= -match_threshold
+  order by page_section.embedding operator(public.<#>) embedding
+  limit max_results;
+end;
+$$;
+
+create or replace function docs_search_embeddings_nimbus(
+  embedding vector(1536),
+  match_threshold float
+)
+returns table (
+  id bigint,
+  path text,
+  type text,
+  title text,
+  subtitle text,
+  description text,
+  headings text[],
+  slugs text[]
+)
+set search_path = ''
+language plpgsql
+as $$
+#variable_conflict use_variable
+begin
+  return query
+  with match as(
+	select *
+	from public.page_section
+	-- The dot product is negative because of a Postgres limitation, so we negate it
+	where (page_section.embedding operator(public.<#>) embedding) * -1 > match_threshold	
+	-- OpenAI embeddings are normalized to length 1, so
+	-- cosine similarity and dot product will produce the same results.
+	-- Using dot product which can be computed slightly faster.
+	--
+	-- For the different syntaxes, see https://github.com/pgvector/pgvector
+	order by page_section.embedding operator(public.<#>) embedding
+	limit 10
+  )
+  select
+	page.id,
+	page.path,
+	page.type,
+	page.meta ->> 'title' as title,
+	page.meta ->> 'subtitle' as title,
+	page.meta ->> 'description' as description,
+	array_agg(match.heading) as headings,
+	array_agg(match.slug) as slugs
+  from public.page
+  join match on match.page_id = page.id
+  group by page.id;
+end;
+$$;
+
+create or replace function search_content_nimbus(
+  embedding vector(1536),
+  include_full_content boolean default false,
+  match_threshold float default 0.78,
+  max_result int default 30
+)
+returns table (
+  id bigint,
+  page_title text,
+  type text,
+  href text,
+  content text,
+  metadata json,
+  subsections json[]
+)
+set search_path = ''
+language sql
+as $$
+  with matched_section as (
+    select
+      *,
+      row_number() over () as ranking
+    from public.match_embedding(
+      embedding,
+      match_threshold,
+      max_result
+    )
+  )
+  select
+    page.id,
+    meta ->> 'title' as page_title,
+    type,
+    public.get_full_content_url(type, path, null) as href,
+    case
+      when include_full_content
+        then page.content
+      else
+        null
+    end as content,
+    meta as metadata,
+    array_agg(
+      json_build_object(
+        'title', heading,
+        'href', public.get_full_content_url(type, path, slug),
+        'content', matched_section.content
+      )
+    )
+  from matched_section
+  join public.page on matched_section.page_id = page.id
+  group by page.id
+  order by min(ranking);
+$$;
+
