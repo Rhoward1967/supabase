@@ -111,7 +111,7 @@ type PreparedSections = {
 }
 
 async function prepareSections(
-  supabaseClient: SupabaseClient<DatabaseCorrected>,
+  supabaseClient: SupabaseClient,
   pageTable: string,
   pageSectionTable: string,
   shouldRefresh: boolean,
@@ -481,27 +481,38 @@ async function updateSuccessfulChecksums(
   processingResult: ProcessingResult
 ): Promise<number> {
   let successfulChecksumUpdates = 0
-  for (const pageId of processingResult.successfulPages) {
-    const pageInfo = pageInfoMap.get(pageId)
-    if (!pageInfo) {
-      console.error(`Missing page info for pageId ${pageId}`)
-      continue
-    }
+  const pageIds = Array.from(processingResult.successfulPages)
+  const batches = createBatches(pageIds, CONFIG.SOURCE_CONCURRENCY)
 
-    try {
-      const { error: updatePageError } = await supabaseClient
-        .from(pageTable)
-        .update({ checksum: pageInfo.checksum })
-        .eq('id', pageId)
-      if (updatePageError) {
-        console.error(`Failed to update checksum for page ${pageInfo.path}:`, updatePageError)
-      } else {
-        successfulChecksumUpdates++
-      }
-    } catch (error) {
-      console.error(`Error updating checksum for page ${pageInfo.path}:`, error)
-    }
+  for (const batch of batches) {
+    const results = await Promise.all(
+      batch.map(async (pageId) => {
+        const pageInfo = pageInfoMap.get(pageId)
+        if (!pageInfo) {
+          console.error(`Missing page info for pageId ${pageId}`)
+          return 0
+        }
+
+        try {
+          const { error: updatePageError } = await supabaseClient
+            .from(pageTable)
+            .update({ checksum: pageInfo.checksum })
+            .eq('id', pageId)
+          if (updatePageError) {
+            console.error(`Failed to update checksum for page ${pageInfo.path}:`, updatePageError)
+            return 0
+          }
+          return 1
+        } catch (error) {
+          console.error(`Error updating checksum for page ${pageInfo.path}:`, error)
+          return 0
+        }
+      })
+    )
+
+    successfulChecksumUpdates += results.reduce((sum, x) => sum + x, 0)
   }
+
   return successfulChecksumUpdates
 }
 
