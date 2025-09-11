@@ -128,9 +128,10 @@ async function prepareSections(
   pageSectionTable: string,
   shouldRefresh: boolean,
   refreshVersion: string,
-  refreshDate: Date
+  refreshDate: Date,
+  fullIndex = true
 ): Promise<PreparedSections> {
-  const embeddingSources = await fetchAllSources()
+  const embeddingSources = await fetchAllSources(fullIndex)
   console.log(`Discovered ${embeddingSources.length} pages`)
 
   const allSectionsToProcess: PageSectionForEmbedding[] = []
@@ -333,18 +334,11 @@ async function processEmbeddingBatch(
 
   // Helper to identify context length exceeded errors from OpenAI
   const isContextLengthError = (err: unknown) => {
-    const msg = typeof err === 'object' && err !== null ? String((err as any).message || '') : ''
-    const code = typeof err === 'object' && err !== null ? String((err as any).code || '') : ''
-    const status = typeof err === 'object' && err !== null ? Number((err as any).status || 0) : 0
-    const text = (msg + ' ' + code).toLowerCase()
-    return (
-      text.includes('context length') ||
-      text.includes('maximum context length') ||
-      text.includes('too many tokens') ||
-      text.includes('max input tokens') ||
-      text.includes('input is too long') ||
-      (status === 400 && text.includes('tokens'))
-    )
+    if (!(err instanceof OpenAI.APIError)) return false
+
+    const message = err.error?.message as string
+    const status = err.status
+    return status === 400 && message.toLowerCase().includes('context')
   }
 
   let embeddingResponse: OpenAI.Embeddings.CreateEmbeddingResponse
@@ -448,7 +442,8 @@ const args = parseArgs({
 async function generateEmbeddings() {
   const shouldRefresh = Boolean(args.values.refresh)
 
-  if (isNimbusMode()) {
+  const nimbus = isNimbusMode()
+  if (nimbus) {
     console.log('Running in Nimbus mode - will filter content based on disabled feature flags')
   }
 
@@ -483,7 +478,8 @@ async function generateEmbeddings() {
     pageSectionTable,
     shouldRefresh,
     refreshVersion,
-    refreshDate
+    refreshDate,
+    !nimbus
   )
 
   console.log(`Embedding processing and insertion for ${allSectionsToProcess.length} sections`)
