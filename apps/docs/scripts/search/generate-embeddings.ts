@@ -340,11 +340,13 @@ async function generateEmbeddings() {
   const allSectionsToProcess: PageSectionForEmbedding[] = []
   const pageInfoMap = new Map<number, PageInfo>()
 
-  await Promise.all(
-    embeddingSources.map(async (embeddingSource) => {
-      const { type, source, path } = embeddingSource
+  // Limit concurrency when processing embedding sources to reduce DB/API pressure
+  for (const sourceBatch of createBatches(embeddingSources, CONFIG.SOURCE_CONCURRENCY)) {
+    await Promise.all(
+      sourceBatch.map(async (embeddingSource) => {
+        const { type, source, path } = embeddingSource
 
-      try {
+        try {
         const {
           checksum,
           sections,
@@ -464,8 +466,9 @@ async function generateEmbeddings() {
         )
         console.error(err)
       }
-    })
-  )
+      })
+    )
+  }
 
   // Phase 2: Process embeddings and insert with streaming (no memory accumulation)
   console.log(
